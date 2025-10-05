@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+body {
+  font-family: "PpTelegraf", sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "PpTelegraf", sans-serif;
+  font-optical-sizing: auto;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-RegularOblique.otf") format("opentype");
+  font-weight: 400;
+  font-style: oblique;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-RegularSlanted.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-Ultrabold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-UltraboldOblique.otf") format("opentype");
+  font-weight: 800;
+  font-style: oblique;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-Ultralight.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "PpTelegraf";
+  src: url("./assets/fonts/PPTelegraf-UltralightOblique.otf") format("opentype");
+  font-weight: 200;
+  font-style: oblique;
+}
+
+:root {
+  --primary: #072d2d;
+  --primary-inverse: #E1E4D8;
+  --sand: #e1e4d8;
+  --sand-64: #e1e4d8a3;
+}
+
+@layer utilities {
+  .font-pp {
+    font-family: "PpTelegraf", sans-serif;
+  }
+
+  .bg-primary {
+    background-color: var(--primary);
+  }
+
+  .bg-sand {
+    background-color: var(--sand);
+  }
+
+  .text-primary {
+    color: var(--primary);
+  }
+
+  .text-primary-inverse {
+    color: var(--primary-inverse)
+  }
+
+  .text-sand {
+    color: var(--sand);
+  }
+
+  .text-sand-64 {
+    color: var(--sand-64);
+  }
+}
