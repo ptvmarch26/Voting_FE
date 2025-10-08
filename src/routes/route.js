@@ -6,8 +6,9 @@ import NotFoundPage from "../pages/NotFoundPage";
 import AdminLayout from "../admin/layout/AdminLayout";
 import LoginPage from "../admin/pages/LoginPage";
 import DashboardPage from "../admin/pages/DashboardPage";
-import ElectionsPage from "../admin/pages/ElectionsPage";
+import ElectionPage from "../admin/pages/ElectionPage";
 import ElectionDetailsPage from "../admin/pages/ElectionDetailsPage";
+import TrusteePage from "../admin/pages/TrusteePage";
 
 const publicRoutes = [
   {
@@ -40,14 +41,19 @@ const adminRoutes = [
     component: DashboardPage,
     Layout: AdminLayout,
   },
- {
-    path: "/admin/elections",
-    component: ElectionsPage,
+  {
+    path: "/admin/election",
+    component: ElectionPage,
     Layout: AdminLayout,
   },
-   {
+  {
     path: "/admin/election-details/:id",
     component: ElectionDetailsPage,
+    Layout: AdminLayout,
+  },
+  {
+    path: "/admin/trustee",
+    component: TrusteePage,
     Layout: AdminLayout,
   },
 ];

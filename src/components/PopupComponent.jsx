@@ -17,11 +17,11 @@ const PopupComponent = ({
   }, [timeout, onClose]);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[1000]">
+    <div className="fixed inset-0 flex items-center justify-center !z-[10000000]">
       {/* Overlay */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black bg-opacity-50"
+        className="absolute inset-0 bg-black opacity-50"
       ></div>
 
       {/* Popup */}

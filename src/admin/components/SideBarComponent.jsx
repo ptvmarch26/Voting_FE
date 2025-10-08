@@ -1,19 +1,31 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FiHome, FiLogOut } from "react-icons/fi";
 import { MdHowToVote } from "react-icons/md";
+import { IoIosPeople } from "react-icons/io";
+import { useOrganization } from "../../contexts/OrganizationContext";
 
 function SidebarComponent({ isOpen, toggleSidebar }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { role, handleLogout } = useOrganization();
 
-  const menuItems = [
+  const baseMenu = [
     { name: "Dashboard", path: "/admin/dashboard", icon: <FiHome size={20} /> },
+  ];
+  const caMenu = [
     {
       name: "Quản lý bầu cử",
-      path: "/admin/elections",
+      path: "/admin/election",
       icon: <MdHowToVote size={20} />,
     },
+    {
+      name: "Quản lý Trustee",
+      path: "/admin/trustee",
+      icon: <IoIosPeople size={20} />,
+    },
   ];
+
+  const menuItems = role === "CA" ? [...baseMenu, ...caMenu] : [...baseMenu];
 
   return (
     <div>
@@ -65,7 +77,7 @@ function SidebarComponent({ isOpen, toggleSidebar }) {
             <li>
               <button
                 onClick={() => {
-                  // handleLogout();
+                  handleLogout();
                   navigate("/admin");
                 }}
                 className="flex items-center gap-3 p-4 mt-5 rounded transition-all duration-200 text-red-600 hover:bg-red-600 hover:text-white w-full"

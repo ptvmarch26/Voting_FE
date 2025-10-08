@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { usePopup } from "../../contexts/PopupContext";
+import { useOrganization } from "../../contexts/OrganizationContext";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -11,14 +12,14 @@ const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const { showPopup } = usePopup();
-
+  const { token, handleLoginOrganization } = useOrganization();
   const togglePasswordVisiblity = () => setPasswordShown((cur) => !cur);
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
+    if (token) {
       navigate("/admin/dashboard", { replace: true });
     }
-  }, [navigate]);
+  }, [token, navigate]);
 
   const handleSubmitLogin = async () => {
     let newError = {};
@@ -33,6 +34,19 @@ const LoginPage = () => {
     }
 
     setError(newError);
+    if (Object.keys(newError).length > 0) return;
+
+    const res = await handleLoginOrganization(username, password);
+    console.log("res", res);
+    if (
+      res?.EC === 0 &&
+      (res?.result?.role === "CA" || res?.result?.role === "TRUSTEE")
+    ) {
+      showPopup("Đăng nhập thành công!");
+      navigate("/admin/dashboard");
+    } else {
+      showPopup(res.EM || "Đăng nhập thất bại", false);
+    }
   };
 
   return (

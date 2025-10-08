@@ -1,13 +1,16 @@
 import { FiMenu } from "react-icons/fi";
 import { useLocation } from "react-router-dom";
+import { useOrganization } from "../../contexts/OrganizationContext";
 // import user_img from "../../assets/images/user_img.jpg";
 
-function TopbarComponent({ admin_name, toggleSidebar }) {
+function TopbarComponent({ toggleSidebar }) {
   const location = useLocation();
+  const { orgName } = useOrganization();
 
   const pageTitles = {
     "/admin/dashboard": "Dashboard",
-    "/admin/elections": "Danh sách cuộc bầu cử",
+    "/admin/election": "Danh sách cuộc bầu cử",
+    "/admin/trustee": "Danh sách Trustee",
   };
 
   let currentPage = "Admin Panel";
@@ -25,11 +28,11 @@ function TopbarComponent({ admin_name, toggleSidebar }) {
         <button className="lg:hidden text-gray-700" onClick={toggleSidebar}>
           <FiMenu size={24} />
         </button>
-        <h1 className="text-xl font-semibold">{currentPage}</h1>
+        <h1 className="text-xl font-semibold mt-1">{currentPage}</h1>
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="text-md">{admin_name ? admin_name : "Admin"}</span>
+        <span className="text-md">{orgName}</span>
         {/* <img
           src={user_img}
           alt="Admin Avatar"

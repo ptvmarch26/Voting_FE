@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { generateKeys } from "../utils/crypto";
 import { encryptKey, decryptKey } from "../utils/aes";
+import { signMessage } from "../utils/sign";
 import { QRCodeCanvas } from "qrcode.react";
 import { saveAs } from "file-saver";
 import { IoQrCodeOutline } from "react-icons/io5";
 import { BrowserQRCodeReader } from "@zxing/library";
 import Alert from "@mui/material/Alert";
 import TextField from "@mui/material/TextField";
+import { useVoter } from "../contexts/VoterContext";
 
 const ElectionComponent = ({ election }) => {
+  const { handleRegisterVoter, handleGetChallenge, handleVerifyLogin } =
+    useVoter();
   const { id, name, description, startDate, endDate, deadline } = election;
   const [cccd, setCccd] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +23,7 @@ const ElectionComponent = ({ election }) => {
   const [needsPassword, setNeedsPassword] = useState(false);
   const [tempData, setTempData] = useState(null);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!cccd.trim() || !password.trim()) {
       setAlert({
         type: "error",
@@ -42,17 +46,25 @@ const ElectionComponent = ({ election }) => {
     const { skHex, pkHex } = generateKeys();
     const encryptedSk = encryptKey(skHex, password);
 
-    const rawData = JSON.stringify({ sk: encryptedSk, pk: pkHex, cccd });
-    const qrData = btoa(rawData);
-    console.log("qr", qrData);
-    setQrValue(qrData);
+    const res = await handleRegisterVoter(cccd, pkHex, "ELC2024");
+    if (res?.EC === 0) {
+      localStorage.setItem("hashPk", res.result.hashed_key);
+      setAlert({
+        type: "success",
+        text: res?.EM,
+      });
+      const rawData = JSON.stringify({ sk: encryptedSk, pk: pkHex, cccd });
+      const qrData = btoa(rawData);
+      setQrValue(qrData);
 
-    setAlert({
-      type: "success",
-      text: `Đăng ký thành công cho cuộc bầu cử: ID_${id}.`,
-    });
-    setIsRegistered(true);
-    setPassword("");
+      setIsRegistered(true);
+      setPassword("");
+    } else {
+      setAlert({
+        type: "error",
+        text: res?.EM,
+      });
+    }
   };
 
   const handleDownloadQR = () => {
@@ -121,7 +133,7 @@ const ElectionComponent = ({ election }) => {
     reader.readAsDataURL(file);
   };
 
-  const handleDecryptAndLogin = () => {
+  const handleDecryptAndLogin = async () => {
     if (!password.trim()) {
       setAlert({
         type: "error",
@@ -136,11 +148,48 @@ const ElectionComponent = ({ election }) => {
       return;
     }
 
-    localStorage.setItem("sk", decryptedSk);
-    localStorage.setItem("pk", tempData.pk);
-    setNeedsPassword(false);
-    setPassword("");
-    setAlert({ type: "success", text: "Đăng nhập thành công." });
+    const hashPk = localStorage.getItem("hashPk");
+    if (!hashPk) {
+      setAlert({
+        type: "error",
+        text: "Không tìm thấy hash khóa công khai. Hãy đăng ký lại.",
+      });
+      return;
+    }
+
+    const challengeRes = await handleGetChallenge(hashPk, "ELC2024");
+    if (challengeRes.EC !== 0) {
+      setAlert({ type: "error", text: challengeRes.EM });
+      return;
+    }
+
+    const challenge = challengeRes.result.challenge;
+
+    const signatureHex = await signMessage(decryptedSk, challenge);
+
+    if (!signatureHex) {
+      setAlert({ type: "error", text: "Lỗi khi ký challenge." });
+      return;
+    }
+
+    const res = await handleVerifyLogin(
+      tempData.pk,
+      hashPk,
+      signatureHex,
+      "ELC2024"
+    );
+
+    if (res.EC === 0) {
+      const encryptedSk = encryptKey(decryptedSk, password);
+      localStorage.setItem("sk", encryptedSk);
+      localStorage.setItem("pk", tempData.pk);
+      localStorage.removeItem("hashPk");
+      setNeedsPassword(false);
+      setPassword("");
+      setAlert({ type: "success", text: res?.EM });
+    } else {
+      setAlert({ type: "error", text: res?.EM });
+    }
   };
 
   return (

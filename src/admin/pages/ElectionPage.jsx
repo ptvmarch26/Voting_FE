@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Modal,
@@ -16,113 +16,132 @@ import {
   Paper,
   Checkbox,
 } from "@mui/material";
-import { useCSVReader } from "react-papaparse";
 import { useNavigate } from "react-router-dom";
+import { useElection } from "../../contexts/ElectionContext";
+import { usePopup } from "../../contexts/PopupContext";
+import { useLoading } from "../../contexts/LoadingContext";
 
-const ElectionsPage = () => {
-  const [elections, setElections] = useState([
-    {
-      id: 1,
-      name: "Cuộc bầu cử 1",
-      description: "Mô tả mẫu",
-      startDate: "2025-12-01",
-      endDate: "2025-12-31",
-      deadline: "2025-11-30",
-      candidates: ["Nguyễn Văn A", "Trần Thị B"],
-    },
-  ]);
-
+const ElectionPage = () => {
+  const {
+    elections,
+    handleGetElections,
+    handleDeleteElection,
+    handleCreateElection,
+    handlePublishElectionInfo,
+    handleFinalizeAndPublishMerkle,
+  } = useElection();
+  const { showPopup } = usePopup();
+  const { setLoading } = useLoading();
   const [openModal, setOpenModal] = useState(false);
   const [message, setMessage] = useState("");
+  const [electionId, setElectionId] = useState("");
   const [electionName, setElectionName] = useState("");
   const [electionDescription, setElectionDescription] = useState("");
   const [electionStartDate, setElectionStartDate] = useState("");
   const [electionEndDate, setElectionEndDate] = useState("");
   const [electionDeadline, setElectionDeadline] = useState("");
-  const [candidates, setCandidates] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
   const [selectedElections, setSelectedElections] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [editingElection, setEditingElection] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const navigate = useNavigate();
-  const { CSVReader } = useCSVReader();
+
+  useEffect(() => {
+    handleGetElections();
+  }, []);
 
   const handleOpenModal = () => {
-    setEditingElection(null);
+    setElectionId("");
     setElectionName("");
     setElectionDescription("");
     setElectionStartDate("");
     setElectionEndDate("");
     setElectionDeadline("");
-    setCandidates([]);
+    setCsvFile(null);
     setMessage("");
     setOpenModal(true);
   };
 
   const handleCloseModal = () => setOpenModal(false);
 
-  const handleSaveElection = (e) => {
-    e.preventDefault();
-
+  const handleCreate = async () => {
     if (
+      !electionId ||
       !electionName ||
       !electionDescription ||
       !electionStartDate ||
       !electionEndDate ||
       !electionDeadline
     ) {
-      setMessage("Vui lòng nhập đầy đủ tất cả các trường!");
+      setMessage("Vui lòng nhập đầy đủ thông tin!");
       return;
     }
 
-    if (editingElection) {
-      setElections((prev) =>
-        prev.map((el) =>
-          el.id === editingElection.id
-            ? {
-                ...el,
-                name: electionName,
-                description: electionDescription,
-                startDate: electionStartDate,
-                endDate: electionEndDate,
-                deadline: electionDeadline,
-                candidates,
-              }
-            : el
-        )
-      );
-    } else {
-      const newElection = {
-        id: elections.length + 1,
-        name: electionName,
-        description: electionDescription,
-        startDate: electionStartDate,
-        endDate: electionEndDate,
-        deadline: electionDeadline,
-        candidates,
-      };
-      setElections([...elections, newElection]);
+    if (!csvFile) {
+      setMessage("Vui lòng chọn file CSV cử tri!");
+      return;
     }
 
-    setEditingElection(null);
-    handleCloseModal();
+    const formData = new FormData();
+    formData.append("election_id", electionId);
+    formData.append("name", electionName);
+    formData.append("description", electionDescription);
+    formData.append("start_date", electionStartDate);
+    formData.append("end_date", electionEndDate);
+    formData.append("deadline_register", electionDeadline);
+    formData.append("file", csvFile);
+
+    setLoading(true, "Đang tạo cuộc bầu cử");
+    const res = await handleCreateElection(formData);
+
+    if (res.EC === 0) {
+      setLoading(true, "Đang publish thông tin bầu cử lên blockchain");
+      const publishRes = await handlePublishElectionInfo(
+        res.result.election_id
+      );
+      setOpenModal(false);
+      setLoading(false);
+      if (publishRes?.EC === 0) {
+        showPopup(`Tạo và publish cuộc bầu cử lên blockchain thành công`);
+      } else {
+        showPopup(publishRes?.EM || "Publish thông tin thất bại", false);
+      }
+    } else {
+      showPopup(res.EM || "Tạo cuộc bầu cử thất bại", false);
+    }
   };
 
-  const handleEditElection = (election) => {
-    setEditingElection(election);
-    setElectionName(election.name);
-    setElectionDescription(election.description || "");
-    setElectionStartDate(election.startDate);
-    setElectionEndDate(election.endDate);
-    setElectionDeadline(election.deadline);
-    setCandidates(election.candidates || []);
-    setOpenModal(true);
+  const handleCreateMerkleRoot = async (election_id) => {
+    setLoading(true, "Đang tạo và publish Merkle root");
+    const res = await handleFinalizeAndPublishMerkle(election_id);
+    console.log("res", res);
+    setLoading(false);
+
+    if (res?.EC === 0) {
+      showPopup("Tạo và publish Merkle root thành công!", true);
+    } else {
+      showPopup(res?.EM || "Tạo Merkle root thất bại", false);
+    }
   };
 
-  const handleDeleteSelected = () => {
-    setElections((prev) =>
-      prev.filter((el) => !selectedElections.includes(el.id))
+  const handleDeleteSelected = async () => {
+    if (selectedElections.length === 0) return;
+    const confirm = window.confirm(
+      "Bạn có chắc muốn xoá các cuộc bầu cử đã chọn"
     );
+    if (!confirm) return;
+
+    let successCount = 0;
+    for (const id of selectedElections) {
+      const res = await handleDeleteElection(id);
+      if (res?.EC === 0) successCount++;
+    }
+
+    if (successCount > 0) showPopup(`Đã xoá cuộc bầu cử thành công`, true);
+    else showPopup("Không thể xoá các cuộc bầu cử đã chọn", false);
+
     setSelectedElections([]);
     setSelectAll(false);
   };
@@ -137,14 +156,18 @@ const ElectionsPage = () => {
     if (selectAll) {
       setSelectedElections([]);
     } else {
-      setSelectedElections(elections.map((el) => el.id));
+      setSelectedElections(elections.map((el) => el.election_id));
     }
     setSelectAll(!selectAll);
   };
 
-  const handleFileUpload = (results) => {
-    const candidatesList = results.data.map((row) => row[0]);
-    setCandidates(candidatesList);
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(+event.target.value);
+    setPage(0);
   };
 
   const columns = [
@@ -159,35 +182,27 @@ const ElectionsPage = () => {
       ),
       minWidth: 50,
     },
+    { id: "election_id", label: "Mã cuộc bầu cử", minWidth: 150 },
     { id: "name", label: "Tên cuộc bầu cử", minWidth: 170 },
-    { id: "startDate", label: "Ngày bắt đầu", minWidth: 130 },
-    { id: "endDate", label: "Ngày kết thúc", minWidth: 130 },
-    { id: "deadline", label: "Hạn đăng ký", minWidth: 150 },
-    { id: "candidates", label: "Ứng cử viên", minWidth: 200 },
+    { id: "start_date", label: "Ngày bắt đầu", minWidth: 130 },
+    { id: "end_date", label: "Ngày kết thúc", minWidth: 130 },
+    { id: "deadline_register", label: "Hạn đăng ký", minWidth: 150 },
+    { id: "status", label: "Trạng thái", minWidth: 130 },
+    { id: "merkle_root", label: "Merkle root", minWidth: 130 },
     { id: "actions", label: "Hành động", minWidth: 180 },
   ];
 
   const rows = elections.map((el) => ({
-    id: el.id,
+    id: el.election_id,
+    election_id: el.election_id,
     name: el.name,
-    startDate: el.startDate,
-    endDate: el.endDate,
-    deadline: el.deadline,
-    candidates: el.candidates.join(", "),
+    start_date: el.start_date?.slice(0, 10),
+    end_date: el.end_date?.slice(0, 10),
+    deadline_register: el.deadline_register?.slice(0, 10),
+    status: el.status,
+    merkle_root: el.merkle_root || "Chưa có merkle root",
   }));
-
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
-    setPage(0);
-  };
-
+  console.log("el", elections);
   return (
     <div className="lg:ml-[300px] mt-[64px] px-2 py-4 lg:p-6 min-h-screen">
       <Paper sx={{ width: "100%", overflow: "hidden" }}>
@@ -213,29 +228,36 @@ const ElectionsPage = () => {
                         onChange={() => handleSelectElection(row.id)}
                       />
                     </TableCell>
+                    <TableCell>{row.election_id}</TableCell>
                     <TableCell>{row.name}</TableCell>
-                    <TableCell>{row.startDate}</TableCell>
-                    <TableCell>{row.endDate}</TableCell>
-                    <TableCell>{row.deadline}</TableCell>
-                    <TableCell>{row.candidates}</TableCell>
-                    <TableCell>
+                    <TableCell>{row.start_date}</TableCell>
+                    <TableCell>{row.end_date}</TableCell>
+                    <TableCell>{row.deadline_register}</TableCell>
+                    <TableCell>{row.status}</TableCell>
+                    <TableCell>{row.merkle_root}</TableCell>
+                    <TableCell className="!flex flex-col gap-2">
                       <Button
                         size="small"
+                        variant="contained"
                         onClick={() =>
                           navigate(`/admin/election-details/${row.id}`)
                         }
                       >
                         Xem
                       </Button>
+
                       <Button
                         size="small"
-                        onClick={() =>
-                          handleEditElection(
-                            elections.find((el) => el.id === row.id)
-                          )
+                        color="success"
+                        variant="contained"
+                        className=""
+                        onClick={() => handleCreateMerkleRoot(row.id)}
+                        disabled={
+                          !!row.merkle_root &&
+                          row.merkle_root !== "Chưa có merkle root"
                         }
                       >
-                        Sửa
+                        Tạo Root
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -243,6 +265,7 @@ const ElectionsPage = () => {
             </TableBody>
           </Table>
         </TableContainer>
+
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
@@ -264,7 +287,7 @@ const ElectionsPage = () => {
           onClick={handleDeleteSelected}
           disabled={selectedElections.length === 0}
         >
-          Xóa đã chọn
+          Xóa cuộc bầu cử
         </Button>
       </div>
 
@@ -283,7 +306,7 @@ const ElectionsPage = () => {
           }}
         >
           <Typography variant="h6" gutterBottom>
-            {editingElection ? "Chỉnh sửa cuộc bầu cử" : "Tạo cuộc bầu cử mới"}
+            Tạo cuộc bầu cử mới
           </Typography>
 
           {message && (
@@ -292,6 +315,13 @@ const ElectionsPage = () => {
             </Alert>
           )}
 
+          <TextField
+            label="Mã cuộc bầu cử *"
+            fullWidth
+            margin="normal"
+            value={electionId}
+            onChange={(e) => setElectionId(e.target.value)}
+          />
           <TextField
             label="Tên cuộc bầu cử *"
             fullWidth
@@ -316,6 +346,10 @@ const ElectionsPage = () => {
             value={electionStartDate}
             onChange={(e) => setElectionStartDate(e.target.value)}
             InputLabelProps={{ shrink: true }}
+            inputProps={{
+              min: electionDeadline || undefined,
+              max: electionEndDate || undefined,
+            }}
           />
           <TextField
             label="Ngày kết thúc *"
@@ -325,6 +359,9 @@ const ElectionsPage = () => {
             value={electionEndDate}
             onChange={(e) => setElectionEndDate(e.target.value)}
             InputLabelProps={{ shrink: true }}
+            inputProps={{
+              min: electionStartDate || undefined,
+            }}
           />
           <TextField
             label="Hạn đăng ký *"
@@ -334,27 +371,29 @@ const ElectionsPage = () => {
             value={electionDeadline}
             onChange={(e) => setElectionDeadline(e.target.value)}
             InputLabelProps={{ shrink: true }}
+            inputProps={{
+              max: electionStartDate || undefined,
+            }}
           />
 
-          <CSVReader onUploadAccepted={handleFileUpload}>
-            {({ getRootProps, acceptedFile, ProgressBar }) => (
-              <div {...getRootProps()} className="mt-2">
-                <Button variant="outlined" fullWidth component="span">
-                  Import Ứng cử viên
-                </Button>
-                {acceptedFile && <div>{acceptedFile.name}</div>}
-                <ProgressBar />
-              </div>
-            )}
-          </CSVReader>
+          <div className="mt-3">
+            <Typography variant="body2">
+              Tải lên danh sách cử tri (CSV):
+            </Typography>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setCsvFile(e.target.files[0])}
+            />
+          </div>
 
           <Button
             variant="contained"
             fullWidth
             className="!mt-4"
-            onClick={handleSaveElection}
+            onClick={handleCreate}
           >
-            {editingElection ? "Lưu thay đổi" : "Tạo cuộc bầu cử"}
+            Tạo cuộc bầu cử
           </Button>
         </Box>
       </Modal>
@@ -362,4 +401,4 @@ const ElectionsPage = () => {
   );
 };
 
-export default ElectionsPage;
+export default ElectionPage;
